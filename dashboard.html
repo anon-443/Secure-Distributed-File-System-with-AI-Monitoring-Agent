@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>SDFS — Security Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root {
+  --bg:       #f5f6fa;
+  --surface:  #ffffff;
+  --border:   #e2e6f0;
+  --text:     #1a1d2e;
+  --muted:    #6b7280;
+  --accent:   #2563eb;
+  --green:    #16a34a;
+  --green-lt: #f0fdf4;
+  --yellow:   #d97706;
+  --yellow-lt:#fffbeb;
+  --red:      #dc2626;
+  --red-lt:   #fef2f2;
+  --orange:   #ea580c;
+  --purple:   #7c3aed;
+  --radius:   10px;
+  --shadow:   0 1px 4px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+
+/* Nav */
+nav{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;height:56px;gap:12px;position:sticky;top:0;z-index:100;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.nav-title{font-size:15px;font-weight:700;color:var(--text)}
+.nav-sub{font-size:11px;color:var(--muted)}
+.nav-spacer{flex:1}
+.nav-badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:var(--green-lt);color:var(--green);border:1px solid #bbf7d0}
+.nav-badge.warn{background:var(--yellow-lt);color:var(--yellow);border-color:#fde68a}
+.nav-badge.crit{background:var(--red-lt);color:var(--red);border-color:#fecaca}
+.pulse{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* Layout */
+main{max-width:1280px;margin:0 auto;padding:20px}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+.page-header h1{font-size:19px;font-weight:700}
+.page-header p{font-size:12px;color:var(--muted);margin-top:2px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text);transition:all .15s}
+.btn:hover{background:var(--bg)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:#1d4ed8}
+.btn-danger{background:var(--red-lt);color:var(--red);border-color:#fecaca}
+
+/* Grid */
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
+
+/* Card */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+.card-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px}
+
+/* KPI */
+.kpi-val{font-size:30px;font-weight:800;line-height:1;letter-spacing:-1px}
+.kpi-lbl{font-size:12px;color:var(--muted);margin-top:4px}
+.kpi-tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;margin-top:6px}
+.tag-good{background:var(--green-lt);color:var(--green)}
+.tag-warn{background:var(--yellow-lt);color:var(--yellow)}
+.tag-bad{background:var(--red-lt);color:var(--red)}
+
+/* GRC ring */
+.grc-wrap{display:flex;align-items:center;gap:22px}
+.ring-box{position:relative;width:110px;height:110px;flex-shrink:0}
+.ring-box svg{transform:rotate(-90deg)}
+.ring-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.ring-num{font-size:24px;font-weight:800}
+.ring-sub{font-size:10px;color:var(--muted);font-weight:600}
+.grc-bars{flex:1}
+.fw-row{margin-bottom:10px}
+.fw-head{display:flex;justify-content:space-between;margin-bottom:3px;font-size:12px}
+.fw-name{font-weight:600}
+.progress{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;transition:width .6s,background .4s}
+
+/* Nodes */
+.node-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.node-box{padding:12px;border-radius:8px;border:1px solid var(--border);background:var(--bg)}
+.node-box.online{border-color:#bbf7d0;background:var(--green-lt)}
+.node-box.offline{border-color:#fecaca;background:var(--red-lt)}
+.node-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px}
+.online .node-dot{background:var(--green)}
+.offline .node-dot{background:var(--red)}
+.node-name{font-size:13px;font-weight:700}
+.node-meta{font-size:11px;color:var(--muted);margin-top:3px}
+
+/* Threat feed */
+.feed{max-height:300px;overflow-y:auto}
+.threat-row{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);align-items:flex-start}
+.threat-row:last-child{border-bottom:none}
+.sev{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;text-transform:uppercase;white-space:nowrap}
+.CRITICAL{background:#fee2e2;color:#991b1b}
+.HIGH{background:#ffedd5;color:#9a3412}
+.MEDIUM{background:#fef9c3;color:#854d0e}
+.LOW{background:var(--green-lt);color:#166534}
+.threat-body{flex:1;min-width:0}
+.threat-type{font-size:13px;font-weight:600;text-transform:capitalize}
+.threat-desc{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.threat-meta{font-size:10px;color:var(--accent);margin-top:2px}
+.threat-ts{font-size:10px;color:#9ca3af}
+.no-data{text-align:center;padding:32px;color:var(--muted);font-size:13px}
+
+/* RCA */
+.rca-scroll{max-height:300px;overflow-y:auto}
+.rca-item{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:11px;margin-bottom:8px}
+.rca-head{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.rca-text{font-size:12px;color:var(--text);line-height:1.6}
+.rca-model{font-size:10px;color:var(--accent);margin-top:4px;font-style:italic}
+
+/* Stats */
+.stat-row{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px}
+.stat-num{font-size:22px;font-weight:800}
+.stat-lbl{font-size:11px;color:var(--muted)}
+
+/* IP chips */
+.ip-chip{display:inline-block;padding:3px 10px;border-radius:20px;background:#fee2e2;color:#991b1b;font-size:12px;font-weight:600;margin:3px;border:1px solid #fecaca}
+
+/* Alert banner */
+.alert-banner{padding:9px 16px;border-radius:8px;margin-bottom:14px;display:none;align-items:center;gap:8px;font-size:13px;font-weight:500;background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+.alert-banner.show{display:flex}
+
+/* File system panel */
+.fs-drop{border:2px dashed var(--border);border-radius:8px;padding:24px;text-align:center;cursor:pointer;background:var(--bg);transition:border-color .2s}
+.fs-drop:hover{border-color:var(--accent)}
+.fs-drop.dragover{border-color:var(--accent);background:var(--green-lt)}
+.file-list-wrap{max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px}
+.file-row{display:flex;align-items:center;padding:9px 12px;border-bottom:1px solid var(--border)}
+.file-row:last-child{border-bottom:none}
+.file-row:hover{background:var(--bg)}
+.file-name{font-size:13px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-meta{font-size:11px;color:var(--muted);margin-top:1px}
+.progress-wrap{display:none;margin-top:10px}
+.progress-lbl{font-size:11px;color:var(--muted);margin-bottom:3px}
+.progress-bar-wrap{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.progress-bar-fill{height:100%;border-radius:3px;background:var(--green);transition:width .3s}
+.activity-log{font-family:monospace;font-size:11px;background:#0f1629;color:#9ca3af;border-radius:8px;padding:10px;max-height:110px;overflow-y:auto;line-height:1.8;margin-top:12px}
+
+/* Type chart bars */
+.type-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.type-lbl{font-size:12px;font-weight:600;min-width:100px;text-transform:capitalize}
+.type-bar{flex:1;height:14px;background:var(--border);border-radius:4px;overflow:hidden}
+.type-bar-fill{height:100%;border-radius:4px;transition:width .5s}
+.type-count{font-size:12px;font-weight:700;min-width:28px;text-align:right}
+
+/* Footer */
+.footer{text-align:center;padding:20px 0 0;font-size:11px;color:#c0c7d4}
+
+@media(max-width:900px){
+  .grid-4,.grid-3{grid-template-columns:1fr 1fr}
+  .grid-2{grid-template-columns:1fr}
+  .node-grid{grid-template-columns:1fr}
+  .grc-wrap{flex-direction:column}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div style="display:flex;flex-direction:column">
+    <span class="nav-title">SDFS Security Monitor</span>
+    <span class="nav-sub">Secure Distributed File System</span>
+  </div>
+  <div class="nav-spacer"></div>
+  <span id="navBadge" class="nav-badge">Connecting...</span>
+  <div class="pulse" id="pulse" title="Auto-refresh every 3s"></div>
+</nav>
+
+<main>
+
+  <!-- Alert -->
+  <div class="alert-banner" id="alertBanner">
+    <span>⚠</span><span id="alertMsg"></span>
+  </div>
+
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1>Security Operations Dashboard</h1>
+      <p>NIST SP 800-207 · NIST AI RMF 1.0 · ISO/IEC 27001 · OWASP Top 10 · Refresh every 3s</p>
+    </div>
+    <div class="actions">
+      <button class="btn btn-danger" onclick="resetGRC()">↺ Reset GRC</button>
+      <button class="btn btn-primary" onclick="exportReport()">⬇ Export CSV</button>
+      <button class="btn" onclick="exportPDF()" style="background:#7c3aed;color:#fff;border-color:#7c3aed" onmouseover="this.style.background='#6d28d9'" onmouseout="this.style.background='#7c3aed'">📄 PDF Report</button>
+    </div>
+  </div>
+
+  <!-- KPI row -->
+  <div class="grid-4">
+    <div class="card">
+      <div class="card-title">GRC Score</div>
+      <div class="kpi-val" id="kGRC" style="color:var(--green)">—</div>
+      <div class="kpi-lbl">Overall compliance</div>
+      <span class="kpi-tag tag-good" id="kGRCTag">—</span>
+    </div>
+    <div class="card">
+      <div class="card-title">Active Threats</div>
+      <div class="kpi-val" id="kThreats" style="color:var(--red)">—</div>
+      <div class="kpi-lbl">Detected incidents</div>
+      <span class="kpi-tag" id="kThreatDelta" style="font-size:11px;color:var(--muted)">—</span>
+    </div>
+    <div class="card">
+      <div class="card-title">System Uptime</div>
+      <div class="kpi-val" id="kUptime" style="font-size:20px">—</div>
+      <div class="kpi-lbl">AI Agent uptime</div>
+      <span class="kpi-tag tag-good" id="kNodes">— / 3 nodes</span>
+    </div>
+    <div class="card">
+      <div class="card-title">Blocked IPs</div>
+      <div class="kpi-val" id="kBlocked" style="color:var(--orange)">—</div>
+      <div class="kpi-lbl">Attacker IPs blocked</div>
+      <span class="kpi-tag tag-warn" id="kFiles">— files</span>
+    </div>
+  </div>
+
+  <!-- GRC + Nodes -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">GRC Compliance Frameworks</div>
+      <div class="grc-wrap">
+        <div class="ring-box">
+          <svg width="110" height="110" viewBox="0 0 110 110">
+            <circle cx="55" cy="55" r="46" fill="none" stroke="#e2e6f0" stroke-width="11"/>
+            <circle id="ringCircle" cx="55" cy="55" r="46" fill="none"
+                    stroke="var(--green)" stroke-width="11"
+                    stroke-dasharray="289" stroke-dashoffset="29"
+                    stroke-linecap="round" style="transition:stroke-dashoffset .8s,stroke .4s"/>
+          </svg>
+          <div class="ring-center">
+            <div class="ring-num" id="ringNum">—</div>
+            <div class="ring-sub">GRC</div>
+          </div>
+        </div>
+        <div class="grc-bars" id="fwBars">
+          <div style="color:var(--muted);font-size:13px">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Storage Nodes <span id="nodesSummary" style="float:right;font-weight:400;text-transform:none;color:var(--muted)">—</span></div>
+      <div class="node-grid" id="nodeGrid">
+        <div class="no-data" style="grid-column:1/-1">Connecting to nodes...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Threat feed + RCA -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Live Threat Feed <span id="threatCount" style="float:right;font-weight:400;text-transform:none;color:var(--muted)">—</span></div>
+      <div class="feed" id="threatFeed"><div class="no-data">No threats detected.</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">AI Root Cause Analysis <span style="float:right;font-weight:400;text-transform:none;color:var(--accent);font-size:10px">qwen3:4b · Ollama</span></div>
+      <div class="rca-scroll" id="rcaLog"><div class="no-data">Waiting for first analysis...</div></div>
+    </div>
+  </div>
+
+  <!-- Stats + Blocked IPs -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">System Statistics</div>
+      <div class="stat-row">
+        <div><div class="stat-num" id="sFiles">—</div><div class="stat-lbl">Files Stored</div></div>
+        <div><div class="stat-num" id="sChunks">—</div><div class="stat-lbl">Chunks</div></div>
+        <div><div class="stat-num" id="sTypes">—</div><div class="stat-lbl">Attack Types</div></div>
+        <div><div class="stat-num" id="sRCA">—</div><div class="stat-lbl">RCA Analyses</div></div>
+      </div>
+      <div class="card-title" style="margin-top:4px">Threats by Type</div>
+      <div id="typeChart"><div style="color:var(--muted);font-size:12px">No attacks recorded.</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Blocked IPs <span id="blockedCount" style="float:right;font-weight:400;text-transform:none;color:var(--muted)">0 total</span></div>
+      <div id="blockedIPs" style="min-height:48px"><span style="color:var(--muted);font-size:13px">No IPs blocked.</span></div>
+      <div class="card-title" style="margin-top:16px">Compliance Controls</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;font-size:12px">
+        <div style="padding:8px;background:var(--green-lt);border-radius:6px;border:1px solid #bbf7d0">
+          <div style="font-weight:700;color:var(--green)">NIST 800-207</div>
+          <div style="color:var(--muted)">Zero Trust</div>
+        </div>
+        <div style="padding:8px;background:#eff6ff;border-radius:6px;border:1px solid #bfdbfe">
+          <div style="font-weight:700;color:var(--accent)">NIST AI RMF</div>
+          <div style="color:var(--muted)">AI Risk Mgmt</div>
+        </div>
+        <div style="padding:8px;background:#faf5ff;border-radius:6px;border:1px solid #e9d5ff">
+          <div style="font-weight:700;color:var(--purple)">ISO 27001</div>
+          <div style="color:var(--muted)">Info Security</div>
+        </div>
+        <div style="padding:8px;background:var(--yellow-lt);border-radius:6px;border:1px solid #fde68a">
+          <div style="font-weight:700;color:var(--yellow)">OWASP Top 10</div>
+          <div style="color:var(--muted)">Web Security</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- File System -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-title">Secure File System — Upload · Encrypt · Download</div>
+
+    <!-- Auth -->
+    <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <label style="font-size:11px;font-weight:600;color:var(--muted)">USERNAME</label>
+        <input id="fsUser" placeholder="Enter username"
+               style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;width:140px;outline:none"/>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <label style="font-size:11px;font-weight:600;color:var(--muted)">PASSWORD</label>
+        <input id="fsPass" type="password" placeholder="Enter password"
+               style="padding:7px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;width:140px;outline:none"/>
+      </div>
+      <button onclick="fsLogin()" class="btn btn-primary">🔑 Login</button>
+      <div id="fsAuthStatus" style="font-size:12px;color:var(--muted);align-self:center"></div>
+      <div id="fsAuthBadge" style="display:none;padding:4px 12px;background:var(--green-lt);border:1px solid #bbf7d0;border-radius:20px;font-size:11px;font-weight:700;color:var(--green)">✓ Authenticated</div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Upload -->
+      <div>
+        <div style="font-size:12px;font-weight:700;margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px;color:var(--text)">Upload File</div>
+        <div class="fs-drop" id="fsDrop"
+             onclick="document.getElementById('fsFileInput').click()"
+             ondragover="event.preventDefault();this.classList.add('dragover')"
+             ondragleave="this.classList.remove('dragover')"
+             ondrop="fsDrop(event)">
+          <div style="font-size:26px;margin-bottom:6px">📤</div>
+          <div style="font-size:13px;font-weight:600">Click or drag a file here</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">Encrypted with AES-256-GCM before storage</div>
+          <input id="fsFileInput" type="file" style="display:none" onchange="fsFileChosen(this)"/>
+        </div>
+        <div id="fsSelectedFile" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
+        <button id="fsUploadBtn" onclick="fsUpload()" class="btn btn-primary"
+                style="margin-top:8px;width:100%;justify-content:center;display:none">⬆ Upload &amp; Encrypt</button>
+        <div class="progress-wrap" id="fsProgress">
+          <div class="progress-lbl" id="fsProgressLbl">Uploading...</div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="fsProgressFill" style="width:0%"></div>
+          </div>
+        </div>
+        <div id="fsUploadResult" style="margin-top:7px;font-size:12px"></div>
+      </div>
+
+      <!-- File list -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text)">Stored Files</div>
+          <button onclick="fsLoadFiles()" class="btn" style="padding:4px 9px;font-size:11px">↺ Refresh</button>
+        </div>
+        <div class="file-list-wrap" id="fsFileList">
+          <div class="no-data">Login to view files</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity log -->
+    <div class="activity-log" id="fsLog">Ready. Login to use the file system.</div>
+  </div>
+
+  <div class="footer">
+  </div>
+</main>
+
+<script>
+// Endpoints
+const AI_URL     = 'http://localhost:8080';
+const THREAT_URL = 'http://localhost:9005';
+const META_URL   = 'http://localhost:9000';
+
+let prevThreats = 0;
+let fsToken     = null;
+let fsPending   = null;
+
+// Restore token from sessionStorage on page reload
+if (sessionStorage.getItem('fsToken')) {
+  fsToken = sessionStorage.getItem('fsToken');
+}
+
+// ── Utilities ──────────────────────────────────────────────
+
+async function get(url) {
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    return r.ok ? r.json() : null;
+  } catch { return null; }
+}
+
+function scoreColor(s) {
+  return s >= 85 ? 'var(--green)' : s >= 70 ? 'var(--yellow)' : s >= 50 ? 'var(--orange)' : 'var(--red)';
+}
+function scoreLabel(s) {
+  return s >= 85 ? 'GOOD' : s >= 70 ? 'MODERATE' : s >= 50 ? 'HIGH RISK' : 'CRITICAL';
+}
+function tagClass(s) {
+  return s >= 85 ? 'tag-good' : s >= 70 ? 'tag-warn' : 'tag-bad';
+}
+function fmtTime(iso) {
+  try { return new Date(iso).toLocaleTimeString('en-US',{hour12:false}); } catch { return ''; }
+}
+function fmtBytes(b) {
+  if (!b) return '0 B';
+  if (b < 1024) return b + ' B';
+  if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+  return (b/1024/1024).toFixed(2) + ' MB';
+}
+
+// ── Ring ───────────────────────────────────────────────────
+
+function setRing(score) {
+  const circ = 289;
+  const offset = circ - (score / 100) * circ;
+  const c = document.getElementById('ringCircle');
+  c.style.strokeDashoffset = offset;
+  c.style.stroke = scoreColor(score);
+  document.getElementById('ringNum').textContent  = score.toFixed(1);
+  document.getElementById('ringNum').style.color  = scoreColor(score);
+}
+
+// ── Framework bars ─────────────────────────────────────────
+
+function setFrameworks(data) {
+  if (!data?.frameworks) return;
+  const names = {
+    NIST_SP_800_207: 'NIST SP 800-207',
+    NIST_AI_RMF:     'NIST AI RMF',
+    ISO_27001:        'ISO 27001',
+    OWASP_TOP10:     'OWASP Top 10',
+  };
+  document.getElementById('fwBars').innerHTML = Object.entries(data.frameworks).map(([k, fw]) => {
+    const col = scoreColor(fw.score);
+    return `<div class="fw-row">
+      <div class="fw-head"><span class="fw-name">${names[k]||k}</span>
+        <span style="font-weight:700;color:${col}">${fw.score.toFixed(1)}%</span></div>
+      <div class="progress"><div class="progress-fill" style="width:${fw.score}%;background:${col}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// ── Nodes ──────────────────────────────────────────────────
+
+function setNodes(nodes) {
+  if (!nodes) return;
+  const grid = document.getElementById('nodeGrid');
+  let online = 0;
+  grid.innerHTML = Object.entries(nodes).map(([port, info]) => {
+    const up = info.status === 'online';
+    if (up) online++;
+    return `<div class="node-box ${up ? 'online' : 'offline'}">
+      <div style="display:flex;align-items:center">
+        <span class="node-dot"></span>
+        <span class="node-name">Node :${port}</span>
+      </div>
+      <div class="node-meta">
+        ${up ? '🟢 Online' : '🔴 Offline'}<br>
+        ${fmtBytes(info.bytes_stored)} stored · ${info.uptime?.toFixed(0)||0}s up
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('nodesSummary').textContent = `${online} / 3 online`;
+  document.getElementById('kNodes').textContent = `${online} / 3 nodes online`;
+}
+
+// ── Threat feed ────────────────────────────────────────────
+
+function setThreats(data) {
+  if (!data) return;
+  const list  = data.threats || [];
+  const total = data.total   || 0;
+  document.getElementById('threatCount').textContent = `${total} total`;
+  document.getElementById('kThreats').textContent    = total;
+
+  const delta = total - prevThreats;
+  const el    = document.getElementById('kThreatDelta');
+  el.textContent = delta > 0 ? `+${delta} new` : 'No new threats';
+  el.style.color = delta > 0 ? 'var(--red)' : 'var(--muted)';
+  prevThreats = total;
+
+  // Alert banner for CRITICAL
+  const crit = list.find(t => t.severity === 'CRITICAL');
+  const banner = document.getElementById('alertBanner');
+  if (crit) {
+    banner.classList.add('show');
+    document.getElementById('alertMsg').textContent =
+      `CRITICAL: ${crit.description} at ${fmtTime(crit.timestamp)}`;
+  } else {
+    banner.classList.remove('show');
+  }
+
+  const feed = document.getElementById('threatFeed');
+  if (!list.length) {
+    feed.innerHTML = '<div class="no-data">✓ No threats. System clean.</div>';
+    return;
+  }
+  feed.innerHTML = list.slice(0, 20).map(t => `
+    <div class="threat-row">
+      <span class="sev ${t.severity}">${t.severity}</span>
+      <div class="threat-body">
+        <div class="threat-type">${t.type.replace(/_/g,' ')}</div>
+        <div class="threat-desc">${t.description||''}</div>
+        <div class="threat-meta">NIST: ${t.nist_control} · ISO: ${t.iso_control} · IP: ${t.source_ip}</div>
+        <div class="threat-ts">${fmtTime(t.timestamp)}</div>
+      </div>
+    </div>`).join('');
+
+  // Blocked IPs
+  const ips = data.blocked_ips || [];
+  document.getElementById('kBlocked').textContent   = ips.length;
+  document.getElementById('blockedCount').textContent = `${ips.length} total`;
+  document.getElementById('blockedIPs').innerHTML =
+    ips.length
+      ? ips.map(ip => `<span class="ip-chip">🚫 ${ip}</span>`).join('')
+      : '<span style="color:var(--muted);font-size:13px">No IPs blocked.</span>';
+}
+
+// ── Type chart ─────────────────────────────────────────────
+
+function setTypeChart(summary) {
+  if (!summary?.by_type) return;
+  const SKIP   = new Set(['unknown']);
+  const types  = Object.fromEntries(Object.entries(summary.by_type).filter(([k]) => !SKIP.has(k)));
+  const max    = Math.max(...Object.values(types), 1);
+  const colors = {brute_force:'var(--red)',ransomware:'var(--orange)',
+                  exfiltration:'var(--yellow)',ddos:'var(--accent)',jwt_invalid:'var(--purple)'};
+  const el = document.getElementById('typeChart');
+  if (!Object.keys(types).length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:12px">No attacks recorded.</div>';
+    return;
+  }
+  el.innerHTML = Object.entries(types).map(([type, count]) => `
+    <div class="type-bar-row">
+      <span class="type-lbl">${type.replace(/_/g,' ')}</span>
+      <div class="type-bar">
+        <div class="type-bar-fill" style="width:${(count/max)*100}%;background:${colors[type]||'var(--accent)'}"></div>
+      </div>
+      <span class="type-count">${count}</span>
+    </div>`).join('');
+  document.getElementById('sTypes').textContent = Object.keys(types).length;
+}
+
+// ── RCA ────────────────────────────────────────────────────
+
+function setRCA(data) {
+  if (!data?.rca_entries?.length) return;
+  document.getElementById('sRCA').textContent = data.total || 0;
+
+  // Filter out failed/error entries — don't show "AI unavailable" on dashboard
+  const valid = data.rca_entries.filter(e =>
+    e.analysis && !e.analysis.startsWith('AI unavailable') && !e.analysis.startsWith('Ollama is not')
+  );
+
+  const el = document.getElementById('rcaLog');
+  if (!valid.length) {
+    el.innerHTML = '<div class="no-data">⏳ AI analysis pending — Ollama is loading the model, please wait...</div>';
+    return;
+  }
+
+  el.innerHTML = valid.map(e => `
+    <div class="rca-item">
+      <div class="rca-head">
+        <span class="sev ${e.severity}">${e.severity}</span>
+        <span style="font-size:11px;color:var(--muted)">${e.trigger}</span>
+        <span style="margin-left:auto;font-size:10px;color:var(--muted)">${fmtTime(e.timestamp)}</span>
+      </div>
+      <div class="rca-text">${e.analysis||'No analysis.'}</div>
+      <div class="rca-model">Generated by ${e.model}</div>
+    </div>`).join('');
+}
+
+// ── Nav badge ──────────────────────────────────────────────
+
+function setNavBadge(score) {
+  const el = document.getElementById('navBadge');
+  if (score >= 85) { el.className = 'nav-badge'; el.textContent = 'System Healthy'; }
+  else if (score >= 65) { el.className = 'nav-badge warn'; el.textContent = 'Moderate Risk'; }
+  else { el.className = 'nav-badge crit'; el.textContent = 'Critical Risk'; }
+}
+
+// ── Main poll ──────────────────────────────────────────────
+
+async function poll() {
+  document.getElementById('pulse').style.background = 'var(--accent)';
+
+  const [status, grcData, threatsData, summaryData, rcaData] = await Promise.all([
+    get(`${AI_URL}/status`),
+    get(`${THREAT_URL}/grc`),
+    get(`${THREAT_URL}/threats?limit=20`),
+    get(`${THREAT_URL}/threats/summary`),
+    get(`${AI_URL}/rca?limit=5`),
+  ]);
+
+  if (grcData) {
+    const s = grcData.overall_score;
+    document.getElementById('kGRC').textContent    = s.toFixed(1) + '%';
+    document.getElementById('kGRC').style.color    = scoreColor(s);
+    document.getElementById('kGRCTag').textContent = scoreLabel(s);
+    document.getElementById('kGRCTag').className   = 'kpi-tag ' + tagClass(s);
+    setRing(s);
+    setFrameworks(grcData);
+    setNavBadge(s);
+  }
+
+  if (status) {
+    document.getElementById('kUptime').textContent = status.uptime_human || '—';
+    const m = status.metadata || {};
+    document.getElementById('sFiles').textContent  = m.files  ?? '—';
+    document.getElementById('sChunks').textContent = m.chunks ?? '—';
+    document.getElementById('kFiles').textContent  = (m.files ?? 0) + ' files stored';
+    setNodes(status.nodes || {});
+  }
+
+  setThreats(threatsData);
+  setTypeChart(summaryData);
+  setRCA(rcaData);
+
+  document.getElementById('pulse').style.background = 'var(--green)';
+  setTimeout(poll, 3000);
+}
+
+// ── Reset GRC ──────────────────────────────────────────────
+
+async function resetGRC() {
+  try {
+    const r = await fetch(`${THREAT_URL}/reset`, { method: 'POST' });
+    if (r.ok) {
+      prevThreats = 0;
+      document.getElementById('alertBanner').classList.remove('show');
+      document.getElementById('kGRC').textContent    = '95.0%';
+      document.getElementById('kGRC').style.color    = 'var(--green)';
+      document.getElementById('kGRCTag').textContent = 'GOOD';
+      document.getElementById('kGRCTag').className   = 'kpi-tag tag-good';
+      document.getElementById('kThreats').textContent = '0';
+      document.getElementById('blockedIPs').innerHTML = '<span style="color:var(--muted);font-size:13px">No IPs blocked.</span>';
+      document.getElementById('typeChart').innerHTML  = '<div style="color:var(--muted);font-size:12px">No attacks recorded.</div>';
+      document.getElementById('threatFeed').innerHTML = '<div class="no-data">✓ No threats. System clean.</div>';
+      setRing(95);
+      setNavBadge(95);
+    } else {
+      alert('Reset failed. Is Threat Agent running?');
+    }
+  } catch {
+    alert('Cannot reach Threat Agent on port 9005.');
+  }
+}
+
+// ── Export CSV ─────────────────────────────────────────────
+
+async function exportReport() {
+  try {
+    const r = await fetch('performance_report.csv', { method: 'HEAD' });
+    if (r.ok) {
+      const a = document.createElement('a');
+      a.href = 'performance_report.csv';
+      a.download = 'performance_report.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } else {
+      // FIX Bug 3: corrected path (no backend/ prefix)
+      alert('performance_report.csv not found.\n\nRun this first:\n  python performance_test.py');
+    }
+  } catch {
+    alert('performance_report.csv not found.\n\nRun this first:\n  python performance_test.py');
+  }
+}
+
+// ── File system log ────────────────────────────────────────
+
+function fsLog(msg, color) {
+  const el  = document.getElementById('fsLog');
+  const ts  = new Date().toLocaleTimeString('en-US', {hour12:false});
+  const div = document.createElement('div');
+  div.style.color = color || '#9ca3af';
+  div.textContent = `[${ts}]  ${msg}`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function fsSetProgress(pct, label) {
+  document.getElementById('fsProgress').style.display = 'block';
+  document.getElementById('fsProgressFill').style.width = pct + '%';
+  document.getElementById('fsProgressLbl').textContent  = label;
+}
+
+// ── FS Login ───────────────────────────────────────────────
+
+async function fsLogin() {
+  const user = document.getElementById('fsUser').value.trim();
+  const pass = document.getElementById('fsPass').value.trim();
+  if (!user || !pass) {
+    document.getElementById('fsAuthStatus').textContent = 'Enter username and password';
+    document.getElementById('fsAuthStatus').style.color = 'var(--red)';
+    return;
+  }
+  fsLog(`Logging in as "${user}"...`);
+  try {
+    const r = await fetch(`${META_URL}/login`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({username: user, password: pass}),
+    });
+    const d = await r.json();
+    if (r.ok && d.token) {
+      fsToken = d.token;
+      sessionStorage.setItem('fsToken', fsToken);
+      document.getElementById('fsAuthBadge').style.display = 'inline-block';
+      document.getElementById('fsAuthStatus').textContent  = '';
+      fsLog(`✓ Logged in as ${user} (${d.role})`, '#22c55e');
+      fsLoadFiles();
+    } else {
+      document.getElementById('fsAuthStatus').textContent = '✗ ' + (d.error || 'Login failed');
+      document.getElementById('fsAuthStatus').style.color = 'var(--red)';
+      fsLog(`✗ Login failed: ${d.error || 'bad credentials'}`, '#ef4444');
+    }
+  } catch {
+    fsLog('✗ Cannot reach Metadata Server (port 9000)', '#ef4444');
+  }
+}
+
+// ── FS File chosen ─────────────────────────────────────────
+
+function fsFileChosen(input) {
+  const f = input.files[0];
+  if (!f) return;
+  fsPending = f;
+  document.getElementById('fsSelectedFile').textContent = `Selected: ${f.name} (${fmtBytes(f.size)})`;
+  document.getElementById('fsUploadBtn').style.display  = 'flex';
+  document.getElementById('fsDrop').style.borderColor   = 'var(--accent)';
+  fsLog(`File selected: ${f.name} (${fmtBytes(f.size)})`);
+}
+
+function fsDrop(e) {
+  e.preventDefault();
+  document.getElementById('fsDrop').classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (!f) return;
+  fsPending = f;
+  document.getElementById('fsSelectedFile').textContent = `Selected: ${f.name} (${fmtBytes(f.size)})`;
+  document.getElementById('fsUploadBtn').style.display  = 'flex';
+  fsLog(`File dropped: ${f.name} (${fmtBytes(f.size)})`);
+}
+
+// ── FS Upload ──────────────────────────────────────────────
+
+async function fsUpload() {
+  if (!fsToken) { fsLog('✗ Login first', '#ef4444'); return; }
+  if (!fsPending) { fsLog('✗ Select a file first', '#ef4444'); return; }
+
+  const CHUNK = 64 * 1024;
+  const buf   = await fsPending.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  const chunks = [];
+  for (let i = 0; i < bytes.length; i += CHUNK) chunks.push(bytes.slice(i, i + CHUNK));
+  const numChunks = Math.max(chunks.length, 1);
+
+  fsLog(`Starting upload: ${fsPending.name} → ${numChunks} chunk(s)`);
+  fsSetProgress(5, 'Initialising...');
+
+  let initData;
+  try {
+    const r = await fetch(`${META_URL}/upload/init`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+fsToken},
+      body: JSON.stringify({filename: fsPending.name, file_size: fsPending.size, num_chunks: numChunks}),
+    });
+    initData = await r.json();
+    if (!r.ok) throw new Error(initData.error || 'Init failed');
+  } catch(e) {
+    fsLog('✗ Upload init failed: ' + e.message, '#ef4444');
+    return;
+  }
+
+  const fileId = initData.file_id;
+  const plan   = initData.chunk_plan;
+  fsLog(`File ID: ${fileId.slice(0,12)}...`, '#60a5fa');
+
+  const hashes = {};
+  for (let ci = 0; ci < plan.length; ci++) {
+    const cp   = plan[ci];
+    const cd   = chunks[cp.index] || new Uint8Array(0);
+    const port = cp.nodes[0];
+    fsSetProgress(10 + Math.round((ci / plan.length) * 78),
+      `Encrypting chunk ${ci+1}/${plan.length} → node :${port}`);
+    fsLog(`  → chunk ${ci+1}/${plan.length} to node :${port} (${fmtBytes(cd.length)})`);
+    try {
+      const sr = await fetch(`http://localhost:${port}/chunk/store`, {
+        method: 'POST',
+        headers: {'Authorization':'Bearer '+fsToken,'X-Chunk-ID':cp.chunk_id,'Content-Type':'application/octet-stream'},
+        body: cd,
+      });
+      const sd = await sr.json();
+      if (sr.ok) hashes[cp.chunk_id] = sd.sha256 || '';
+      else fsLog(`  ✗ chunk rejected: ${sd.error}`, '#f59e0b');
+    } catch(e) { fsLog(`  ✗ chunk error: ${e.message}`, '#f59e0b'); }
+  }
+
+  fsSetProgress(92, 'Committing...');
+
+  try {
+    const r = await fetch(`${META_URL}/upload/commit`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+fsToken},
+      body: JSON.stringify({file_id: fileId, chunk_hashes: hashes}),
+    });
+    if (r.ok) {
+      fsSetProgress(100, '✓ Upload complete!');
+      document.getElementById('fsUploadResult').innerHTML =
+        `<span style="color:var(--green);font-weight:700">✓ File uploaded & AES-256-GCM encrypted on storage nodes</span>`;
+      fsLog(`✓ Done. File ID: ${fileId}`, '#22c55e');
+      fsPending = null;
+      document.getElementById('fsUploadBtn').style.display  = 'none';
+      document.getElementById('fsSelectedFile').textContent = '';
+      document.getElementById('fsDrop').style.borderColor   = '';
+      setTimeout(fsLoadFiles, 500);
+    } else {
+      const d = await r.json();
+      fsLog('✗ Commit failed: ' + (d.error || '?'), '#ef4444');
+    }
+  } catch(e) { fsLog('✗ Commit error: ' + e.message, '#ef4444'); }
+}
+
+// ── FS Load files ──────────────────────────────────────────
+
+async function fsLoadFiles() {
+  if (!fsToken) return;
+  const el = document.getElementById('fsFileList');
+  el.innerHTML = '<div class="no-data">Loading...</div>';
+  try {
+    const r = await fetch(`${META_URL}/files`, {headers:{'Authorization':'Bearer '+fsToken}});
+    if (!r.ok) {
+      if (r.status === 401) {
+        // Token expired — clear session and prompt re-login
+        fsToken = null;
+        sessionStorage.removeItem('fsToken');
+        document.getElementById('fsAuthBadge').style.display = 'none';
+        el.innerHTML = '<div class="no-data">Session expired. Login again.</div>';
+        return;
+      }
+    }
+    const files = await r.json();
+    if (!Array.isArray(files) || !files.length) {
+      el.innerHTML = '<div class="no-data">No files yet. Upload one above.</div>';
+      return;
+    }
+    el.innerHTML = files.map(f => `
+      <div class="file-row">
+        <div style="flex:1;min-width:0">
+          <div class="file-name">📄 ${f.filename}</div>
+          <div class="file-meta">
+            ${fmtBytes(f.size)} · ${f.chunks?.length||0} chunk(s) · ${f.owner}
+            · <span style="color:${f.status==='complete'?'var(--green)':'var(--yellow)'}">${f.status}</span>
+          </div>
+        </div>
+        <button onclick="fsDownload('${f.file_id}','${f.filename}')"
+                class="btn" style="margin-left:8px;padding:5px 10px;font-size:11px;flex-shrink:0">
+          ⬇ Download
+        </button>
+      </div>`).join('');
+  } catch {
+    el.innerHTML = '<div class="no-data" style="color:var(--red)">Cannot reach Metadata Server</div>';
+  }
+}
+
+// ── FS Download ────────────────────────────────────────────
+
+async function fsDownload(fileId, filename) {
+  if (!fsToken) { fsLog('✗ Login first', '#ef4444'); return; }
+  fsLog(`Downloading: ${filename}`);
+  try {
+    const r = await fetch(`${META_URL}/download/init?file_id=${fileId}`,
+                          {headers:{'Authorization':'Bearer '+fsToken}});
+    if (!r.ok) {
+      // FIX Bug 1: detect 401 on download init and prompt re-login
+      if (r.status === 401) {
+        fsToken = null;
+        sessionStorage.removeItem('fsToken');
+        document.getElementById('fsAuthBadge').style.display = 'none';
+        fsLog('✗ Session expired. Please login again.', '#ef4444');
+        document.getElementById('fsAuthStatus').textContent = 'Session expired — login again';
+        document.getElementById('fsAuthStatus').style.color = 'var(--red)';
+      } else {
+        fsLog('✗ Download init failed', '#ef4444');
+      }
+      return;
+    }
+    const plan = await r.json();
+    const bufs = [];
+    for (const cp of plan.chunk_plan) {
+      const port = cp.nodes[0];
+      fsLog(`  → chunk from node :${port}`);
+      try {
+        const sr = await fetch(`http://localhost:${port}/chunk/retrieve?chunk_id=${cp.chunk_id}`,
+                               {headers:{'Authorization':'Bearer '+fsToken}});
+        // FIX Bug 1: detect 401 on chunk fetch and stop with clear message
+        if (sr.status === 401) {
+          fsToken = null;
+          sessionStorage.removeItem('fsToken');
+          document.getElementById('fsAuthBadge').style.display = 'none';
+          fsLog('✗ Session expired during download. Please login again.', '#ef4444');
+          document.getElementById('fsAuthStatus').textContent = 'Session expired — login again';
+          document.getElementById('fsAuthStatus').style.color = 'var(--red)';
+          return;
+        }
+        if (sr.ok) bufs.push(await sr.arrayBuffer());
+        else fsLog(`  ✗ chunk failed (${sr.status})`, '#f59e0b');
+      } catch(e) { fsLog(`  ✗ node :${port} unreachable`, '#f59e0b'); }
+    }
+    const total  = bufs.reduce((s, b) => s + b.byteLength, 0);
+    const merged = new Uint8Array(total);
+    let   offset = 0;
+    for (const b of bufs) { merged.set(new Uint8Array(b), offset); offset += b.byteLength; }
+    const blob = new Blob([merged]);
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    fsLog(`✓ Downloaded ${filename} (${fmtBytes(total)})`, '#22c55e');
+  } catch(e) { fsLog('✗ Download error: ' + e.message, '#ef4444'); }
+}
+
+// ── Export PDF ─────────────────────────────────────────────
+
+async function exportPDF() {
+  const btn = document.querySelector('button[onclick="exportPDF()"]');
+  btn.textContent = '⏳ Generating...';
+  btn.disabled = true;
+
+  try {
+    // Fetch latest data
+    const [grcData, threatsData, summaryData, statusData, rcaData] = await Promise.all([
+      get(`${THREAT_URL}/grc`),
+      get(`${THREAT_URL}/threats?limit=50`),
+      get(`${THREAT_URL}/threats/summary`),
+      get(`${AI_URL}/status`),
+      get(`${AI_URL}/rca?limit=5`),
+    ]);
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const W = 210, margins = 18;
+    const contentW = W - margins * 2;
+    let y = 0;
+
+    const now = new Date();
+    const dateStr = now.toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'medium' });
+
+    // ── Helper functions ──
+    function checkPage(needed = 12) {
+      if (y + needed > 272) {
+        doc.addPage();
+        y = 18;
+        // Subtle header on continuation pages
+        doc.setFillColor(30, 41, 82);
+        doc.rect(0, 0, W, 10, 'F');
+        doc.setFontSize(8); doc.setTextColor(180, 190, 220);
+        doc.text('SDFS Security Report  —  Continued', margins, 6.5);
+        doc.setTextColor(30, 41, 82);
+        y = 18;
+      }
+    }
+
+    function sectionTitle(title, color = [30, 41, 82]) {
+      checkPage(16);
+      doc.setFillColor(...color);
+      doc.roundedRect(margins, y, contentW, 8.5, 2, 2, 'F');
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+      doc.setTextColor(255, 255, 255);
+      doc.text(title, margins + 4, y + 5.8);
+      doc.setTextColor(30, 41, 82);
+      y += 12;
+    }
+
+    function kpiBox(x, bY, w, h, label, value, valueColor, tag) {
+      doc.setFillColor(248, 249, 252);
+      doc.setDrawColor(220, 225, 235);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(x, bY, w, h, 2, 2, 'FD');
+      doc.setFontSize(7.5); doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 110, 130);
+      doc.text(label.toUpperCase(), x + 4, bY + 5.5);
+      doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...valueColor);
+      doc.text(String(value), x + 4, bY + 13.5);
+      if (tag) {
+        doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 110, 130);
+        doc.text(tag, x + 4, bY + 18.5);
+      }
+      doc.setTextColor(30, 41, 82);
+    }
+
+    function progressBar(x, bY, w, pct, color) {
+      doc.setFillColor(230, 233, 240);
+      doc.roundedRect(x, bY, w, 3, 1, 1, 'F');
+      if (pct > 0) {
+        doc.setFillColor(...color);
+        doc.roundedRect(x, bY, w * (pct / 100), 3, 1, 1, 'F');
+      }
+    }
+
+    function scoreToColor(s) {
+      if (s >= 85) return [22, 163, 74];
+      if (s >= 70) return [217, 119, 6];
+      if (s >= 50) return [234, 88, 12];
+      return [220, 38, 38];
+    }
+
+    function sevColor(sev) {
+      const map = {
+        CRITICAL: [153, 27, 27], HIGH: [154, 52, 18],
+        MEDIUM: [133, 77, 14],   LOW:  [22, 101, 52],
+      };
+      return map[sev] || [80, 80, 80];
+    }
+
+    function sevBg(sev) {
+      const map = {
+        CRITICAL: [254, 226, 226], HIGH: [255, 237, 213],
+        MEDIUM: [254, 249, 195],   LOW:  [240, 253, 244],
+      };
+      return map[sev] || [240, 240, 240];
+    }
+
+    // ══════════════════════════════════════════════
+    // COVER / HEADER
+    // ══════════════════════════════════════════════
+    doc.setFillColor(30, 41, 82);
+    doc.rect(0, 0, W, 48, 'F');
+
+    // Accent stripe
+    doc.setFillColor(37, 99, 235);
+    doc.rect(0, 44, W, 4, 'F');
+
+    doc.setFontSize(18); doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('SDFS Security Operations Report', margins, 18);
+
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+    doc.setTextColor(180, 195, 230);
+    doc.text('Secure Distributed File System  ·  Zero Trust Architecture', margins, 26);
+    doc.text('NIST SP 800-207  ·  NIST AI RMF 1.0  ·  ISO/IEC 27001  ·  OWASP Top 10', margins, 32);
+
+    doc.setFontSize(8.5); doc.setTextColor(140, 160, 210);
+    doc.text(`Generated: ${dateStr}`, margins, 40);
+    doc.text('241582 Adeen Shahzad  &  241566 Manahil Eman  ·  OS Semester Project', W - margins, 40, { align: 'right' });
+
+    y = 58;
+    doc.setTextColor(30, 41, 82);
+
+    // ══════════════════════════════════════════════
+    // KPI ROW
+    // ══════════════════════════════════════════════
+    if (grcData && summaryData && statusData) {
+      const grc    = grcData.overall_score ?? 95;
+      const threats = summaryData.total_threats ?? 0;
+      const blocked = summaryData.blocked_ips_count ?? 0;
+      const nodes   = statusData.nodes_online ?? 0;
+      const boxW = (contentW - 9) / 4;
+
+      kpiBox(margins,           y, boxW, 22, 'GRC Score',      grc.toFixed(1) + '%', scoreToColor(grc), scoreToColor(grc) >= 85 ? 'GOOD' : 'AT RISK');
+      kpiBox(margins + boxW + 3, y, boxW, 22, 'Active Threats', threats, threats > 0 ? [220, 38, 38] : [22, 163, 74], threats > 0 ? 'Incidents logged' : 'System clean');
+      kpiBox(margins + (boxW + 3) * 2, y, boxW, 22, 'Nodes Online', `${nodes} / 3`, nodes === 3 ? [22, 163, 74] : [220, 38, 38], 'Storage nodes');
+      kpiBox(margins + (boxW + 3) * 3, y, boxW, 22, 'Blocked IPs', blocked, blocked > 0 ? [234, 88, 12] : [22, 163, 74], 'Attacker IPs');
+      y += 28;
+    }
+
+    // ══════════════════════════════════════════════
+    // GRC FRAMEWORK SCORES
+    // ══════════════════════════════════════════════
+    sectionTitle('GRC Compliance Framework Scores');
+
+    if (grcData?.frameworks) {
+      const fwNames = {
+        NIST_SP_800_207: 'NIST SP 800-207 (Zero Trust)',
+        NIST_AI_RMF:     'NIST AI RMF 1.0',
+        ISO_27001:        'ISO/IEC 27001:2022',
+        OWASP_TOP10:     'OWASP Top 10 2021',
+      };
+      const barW = contentW - 55;
+
+      for (const [key, fw] of Object.entries(grcData.frameworks)) {
+        checkPage(10);
+        const col = scoreToColor(fw.score);
+        doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 41, 82);
+        doc.text(fwNames[key] || key, margins, y + 3);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...col);
+        doc.text(fw.score.toFixed(1) + '%', W - margins, y + 3, { align: 'right' });
+
+        progressBar(margins, y + 5, barW, fw.score, col);
+
+        // Weight badge
+        doc.setFillColor(240, 242, 248);
+        doc.roundedRect(margins + barW + 3, y + 3.5, 16, 4.5, 1, 1, 'F');
+        doc.setFontSize(7); doc.setTextColor(80, 90, 120);
+        doc.text(`W: ${(fw.weight * 100).toFixed(0)}%`, margins + barW + 11, y + 6.8, { align: 'center' });
+
+        // Controls
+        if (fw.controls?.length) {
+          doc.setFontSize(7); doc.setTextColor(100, 110, 140);
+          doc.text('Controls: ' + fw.controls.join(', '), margins, y + 12);
+        }
+
+        doc.setTextColor(30, 41, 82);
+        y += 16;
+      }
+
+      // Overall weighted score row
+      checkPage(10);
+      const overall = grcData.overall_score ?? 95;
+      const overallCol = scoreToColor(overall);
+      doc.setFillColor(...overallCol.map(c => Math.min(255, c + 180)));
+      doc.setDrawColor(...overallCol);
+      doc.setLineWidth(0.4);
+      doc.roundedRect(margins, y, contentW, 8, 2, 2, 'FD');
+      doc.setFontSize(9.5); doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...overallCol);
+      doc.text(`Overall GRC Score: ${overall.toFixed(1)}%`, margins + 5, y + 5.3);
+      const lbl = overall >= 85 ? 'GOOD' : overall >= 70 ? 'MODERATE' : overall >= 50 ? 'HIGH RISK' : 'CRITICAL';
+      doc.text(lbl, W - margins - 5, y + 5.3, { align: 'right' });
+      doc.setTextColor(30, 41, 82);
+      y += 14;
+    }
+
+    // ══════════════════════════════════════════════
+    // THREAT SUMMARY
+    // ══════════════════════════════════════════════
+    sectionTitle('Threat Summary & Attack Statistics', [37, 99, 235]);
+
+    if (summaryData) {
+      const bySev  = summaryData.by_severity  || {};
+      const byType = summaryData.by_type       || {};
+      const sevOrder = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
+
+      // Severity chips row
+      checkPage(14);
+      doc.setFontSize(8.5); doc.setFont('helvetica', 'bold');
+      doc.setTextColor(60, 70, 100);
+      doc.text('By Severity:', margins, y + 4);
+
+      let chipX = margins + 26;
+      for (const sev of sevOrder) {
+        const cnt = bySev[sev] ?? 0;
+        const bg = sevBg(sev); const fg = sevColor(sev);
+        doc.setFillColor(...bg); doc.setDrawColor(...fg); doc.setLineWidth(0.3);
+        doc.roundedRect(chipX, y, 22, 7, 1.5, 1.5, 'FD');
+        doc.setFontSize(7.5); doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...fg);
+        doc.text(`${sev} ${cnt}`, chipX + 11, y + 4.8, { align: 'center' });
+        chipX += 25;
+      }
+      doc.setTextColor(30, 41, 82);
+      y += 12;
+
+      // By type bars
+      if (Object.keys(byType).length) {
+        checkPage(10);
+        doc.setFontSize(8.5); doc.setFont('helvetica', 'bold');
+        doc.setTextColor(60, 70, 100);
+        doc.text('By Attack Type:', margins, y + 4);
+        y += 7;
+
+        const typeColors = {
+          brute_force: [220, 38, 38], ransomware: [234, 88, 12],
+          exfiltration: [217, 119, 6], ddos: [37, 99, 235], jwt_invalid: [124, 58, 237],
+        };
+        const maxCount = Math.max(...Object.values(byType), 1);
+        const barAreaW = contentW - 48;
+
+        for (const [type, count] of Object.entries(byType)) {
+          checkPage(8);
+          const col = typeColors[type] || [100, 100, 100];
+          doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+          doc.setTextColor(40, 50, 80);
+          doc.text(type.replace(/_/g, ' '), margins, y + 3.2);
+          progressBar(margins + 28, y, barAreaW, (count / maxCount) * 100, col);
+          doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(...col);
+          doc.text(String(count), W - margins, y + 3.2, { align: 'right' });
+          doc.setTextColor(30, 41, 82);
+          y += 7;
+        }
+      }
+
+      // Blocked IPs
+      if (threatsData?.blocked_ips?.length) {
+        checkPage(12);
+        y += 2;
+        doc.setFontSize(8.5); doc.setFont('helvetica', 'bold');
+        doc.setTextColor(60, 70, 100);
+        doc.text('Blocked Attacker IPs:', margins, y);
+        y += 5;
+        let bX = margins;
+        for (const ip of threatsData.blocked_ips) {
+          if (bX + 32 > W - margins) { bX = margins; y += 7; }
+          doc.setFillColor(254, 226, 226); doc.setDrawColor(254, 202, 202); doc.setLineWidth(0.3);
+          doc.roundedRect(bX, y - 4, 30, 6, 1.5, 1.5, 'FD');
+          doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(153, 27, 27);
+          doc.text('🚫 ' + ip, bX + 15, y - 0.5, { align: 'center' });
+          bX += 33;
+        }
+        doc.setTextColor(30, 41, 82);
+        y += 10;
+      }
+    }
+
+    // ══════════════════════════════════════════════
+    // LIVE THREAT LOG (last 15)
+    // ══════════════════════════════════════════════
+    if (threatsData?.threats?.length) {
+      sectionTitle('Recent Threat Events (Last 15)', [124, 58, 237]);
+
+      const list = threatsData.threats.slice(0, 15);
+      // Table header
+      checkPage(8);
+      doc.setFillColor(240, 242, 250);
+      doc.rect(margins, y, contentW, 6.5, 'F');
+      doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 70, 120);
+      doc.text('SEV',        margins + 2,  y + 4.3);
+      doc.text('TYPE',       margins + 20, y + 4.3);
+      doc.text('DESCRIPTION',margins + 58, y + 4.3);
+      doc.text('SOURCE IP',  margins + 130, y + 4.3);
+      doc.text('TIME',       margins + 162, y + 4.3);
+      y += 7;
+
+      for (const t of list) {
+        checkPage(7);
+        const bg = y % 14 < 7 ? [252, 253, 255] : [255, 255, 255];
+        doc.setFillColor(...bg);
+        doc.rect(margins, y, contentW, 6, 'F');
+
+        // Severity pill
+        const sbg = sevBg(t.severity); const sfg = sevColor(t.severity);
+        doc.setFillColor(...sbg); doc.setDrawColor(...sfg); doc.setLineWidth(0.2);
+        doc.roundedRect(margins + 1, y + 0.8, 16, 4.5, 1, 1, 'FD');
+        doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...sfg);
+        doc.text(t.severity, margins + 9, y + 3.8, { align: 'center' });
+
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(40, 50, 80);
+        doc.text((t.type||'').replace(/_/g,' '), margins + 20, y + 4);
+
+        const desc = (t.description || '').slice(0, 42);
+        doc.text(desc, margins + 58, y + 4);
+        doc.text(t.source_ip || '—', margins + 130, y + 4);
+
+        doc.setTextColor(100, 110, 140);
+        try { doc.text(new Date(t.timestamp).toLocaleTimeString('en-US',{hour12:false}), margins + 162, y + 4); } catch {}
+        doc.setTextColor(30, 41, 82);
+        y += 6.2;
+      }
+      y += 4;
+    }
+
+    // ══════════════════════════════════════════════
+    // SYSTEM STATUS
+    // ══════════════════════════════════════════════
+    sectionTitle('System Status — Storage Nodes', [22, 101, 52]);
+
+    if (statusData?.nodes) {
+      checkPage(10);
+      const nodeW = (contentW - 6) / 3;
+      let nX = margins;
+      for (const [port, info] of Object.entries(statusData.nodes)) {
+        const up = info.status === 'online';
+        const bg = up ? [240, 253, 244] : [254, 242, 242];
+        const bd = up ? [134, 239, 172] : [252, 165, 165];
+        const fc = up ? [22, 101, 52]    : [153, 27, 27];
+        doc.setFillColor(...bg); doc.setDrawColor(...bd); doc.setLineWidth(0.4);
+        doc.roundedRect(nX, y, nodeW, 20, 2, 2, 'FD');
+        doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(...fc);
+        doc.text(`Node :${port}`, nX + nodeW / 2, y + 6, { align: 'center' });
+        doc.setFontSize(7.5); doc.setFont('helvetica', 'normal');
+        doc.text(up ? '● Online' : '● Offline', nX + nodeW / 2, y + 11, { align: 'center' });
+        doc.setTextColor(80, 90, 120);
+        const bytes = info.bytes_stored || 0;
+        const bStr  = bytes < 1024 ? `${bytes} B` : bytes < 1048576 ? `${(bytes/1024).toFixed(1)} KB` : `${(bytes/1048576).toFixed(2)} MB`;
+        doc.text(`${bStr} stored`, nX + nodeW / 2, y + 16, { align: 'center' });
+        doc.setTextColor(30, 41, 82);
+        nX += nodeW + 3;
+      }
+      y += 26;
+
+      // Uptime
+      checkPage(8);
+      doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 90, 120);
+      const meta = statusData.metadata || {};
+      doc.text(`AI Agent Uptime: ${statusData.uptime_human || '—'}   ·   Files Stored: ${meta.files ?? '—'}   ·   Chunks: ${meta.chunks ?? '—'}   ·   Ollama Model: ${statusData.ollama_model || '—'}`, margins, y);
+      doc.setTextColor(30, 41, 82);
+      y += 10;
+    }
+
+    // ══════════════════════════════════════════════
+    // AI ROOT CAUSE ANALYSIS
+    // ══════════════════════════════════════════════
+    if (rcaData?.rca_entries?.length) {
+      sectionTitle('AI Root Cause Analysis (Latest Entries)', [124, 58, 237]);
+
+      for (const entry of rcaData.rca_entries.slice(0, 3)) {
+        checkPage(28);
+        const col = scoreToColor(entry.severity === 'CRITICAL' ? 0 : entry.severity === 'WARNING' ? 65 : 90);
+        doc.setFillColor(248, 249, 252); doc.setDrawColor(220, 225, 240); doc.setLineWidth(0.3);
+
+        // Estimate height needed
+        const textLines = doc.splitTextToSize(entry.analysis || 'No analysis.', contentW - 10);
+        const boxH = 10 + textLines.length * 4.5;
+        checkPage(boxH + 4);
+
+        doc.roundedRect(margins, y, contentW, boxH, 2, 2, 'FD');
+
+        // Header row
+        const sbg = sevBg(entry.severity); const sfg = sevColor(entry.severity);
+        doc.setFillColor(...sbg); doc.setLineWidth(0.2); doc.setDrawColor(...sfg);
+        doc.roundedRect(margins + 3, y + 2.5, 18, 5, 1.5, 1.5, 'FD');
+        doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...sfg);
+        doc.text(entry.severity, margins + 12, y + 6, { align: 'center' });
+
+        doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 70, 120);
+        doc.text(`Trigger: ${entry.trigger || 'periodic'}`, margins + 25, y + 6);
+
+        doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(140, 150, 170);
+        try { doc.text(new Date(entry.timestamp).toLocaleString(), W - margins - 3, y + 6, { align: 'right' }); } catch {}
+
+        // Analysis text
+        doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 50, 80);
+        doc.text(textLines, margins + 5, y + 12);
+
+        // Model tag
+        doc.setFontSize(7); doc.setTextColor(37, 99, 235);
+        doc.text(`⚡ ${entry.model || 'AI'}`, margins + 5, y + boxH - 1.5);
+
+        doc.setTextColor(30, 41, 82);
+        y += boxH + 5;
+      }
+    }
+
+    // ══════════════════════════════════════════════
+    // FOOTER ON ALL PAGES
+    // ══════════════════════════════════════════════
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFillColor(245, 246, 250);
+      doc.rect(0, 284, W, 13, 'F');
+      doc.setDrawColor(220, 225, 235); doc.setLineWidth(0.3);
+      doc.line(margins, 284, W - margins, 284);
+      doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(120, 130, 160);
+      doc.text('SDFS · Secure Distributed File System · OS Semester Project', margins, 290);
+      doc.text(`241582 Adeen Shahzad  &  241566 Manahil Eman`, W / 2, 290, { align: 'center' });
+      doc.text(`Page ${i} / ${totalPages}`, W - margins, 290, { align: 'right' });
+    }
+
+    // Save
+    const fname = `SDFS_Security_Report_${now.toISOString().slice(0,10)}.pdf`;
+    doc.save(fname);
+
+  } catch (err) {
+    console.error('PDF export error:', err);
+    alert('PDF generation failed: ' + err.message);
+  } finally {
+    btn.textContent = '📄 PDF Report';
+    btn.disabled = false;
+  }
+}
+
+// ── Auto-restore session ───────────────────────────────────
+
+if (fsToken) {
+  document.getElementById('fsAuthBadge').style.display = 'inline-block';
+  fsLog('Session restored from previous login.', '#22c55e');
+  fsLoadFiles();
+}
+
+poll();
+</script>
+</body>
+</html>
